@@ -12,6 +12,9 @@ import {
   HelpCircle,
 } from 'lucide-react';
 
+// Ліміт часу на кожне питання (у секундах)
+const QUESTION_TIME_LIMIT = 60;
+
 export function QuizPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -20,6 +23,7 @@ export function QuizPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [questionTimeLeft, setQuestionTimeLeft] = useState(QUESTION_TIME_LIMIT);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [existingResult, setExistingResult] = useState<QuizResult | null>(null);
@@ -35,6 +39,7 @@ export function QuizPage() {
     }
   }, [questions, existingResult]);
 
+  // Загальний таймер вікторини (рахує вгору)
   useEffect(() => {
     if (startedAt && !submitting && !existingResult) {
       const interval = setInterval(() => {
@@ -43,6 +48,41 @@ export function QuizPage() {
       return () => clearInterval(interval);
     }
   }, [startedAt, submitting, existingResult]);
+
+  // Таймер на кожне питання: скидається на 60с при зміні питання та рахує вниз
+  useEffect(() => {
+    if (!startedAt || submitting || existingResult || questions.length === 0) {
+      return;
+    }
+
+    setQuestionTimeLeft(QUESTION_TIME_LIMIT);
+
+    const interval = setInterval(() => {
+      setQuestionTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [currentIndex, startedAt, submitting, existingResult, questions.length]);
+
+  // Коли час на питання вичерпано — автоперехід (відповідь не зараховується)
+  useEffect(() => {
+    if (questionTimeLeft !== 0 || submitting || existingResult || questions.length === 0) {
+      return;
+    }
+
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex((prev) => prev + 1);
+    } else {
+      handleSubmit(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionTimeLeft]);
 
   const loadQuestions = async () => {
     try {
@@ -99,13 +139,15 @@ export function QuizPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (skipConfirm = false) => {
     if (!startedAt) return;
 
-    const unansweredCount = questions.filter((q) => !answers[q.id]?.length).length;
-    if (unansweredCount > 0) {
-      if (!window.confirm(`У вас є ${unansweredCount} незатверджених питань. Продовжити?`)) {
-        return;
+    if (!skipConfirm) {
+      const unansweredCount = questions.filter((q) => !answers[q.id]?.length).length;
+      if (unansweredCount > 0) {
+        if (!window.confirm(`У вас є ${unansweredCount} незатверджених питань. Продовжити?`)) {
+          return;
+        }
       }
     }
 
@@ -233,6 +275,7 @@ export function QuizPage() {
   const currentQuestion = questions[currentIndex];
   const progress = ((currentIndex + 1) / questions.length) * 100;
   const answeredCount = Object.keys(answers).filter((k) => answers[k]?.length > 0).length;
+  const isTimeWarning = questionTimeLeft <= 10;
 
   return (
     <div className="max-w-4xl mx-auto pb-4">
@@ -261,6 +304,28 @@ export function QuizPage() {
             >
               <HelpCircle className="w-5 h-5" />
             </button>
+          </div>
+        </div>
+
+        {/* Таймер на поточне питання */}
+        <div className="mt-3 md:mt-4 flex items-center gap-3">
+          <div
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono font-bold text-sm md:text-base whitespace-nowrap transition-colors ${
+              isTimeWarning
+                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse'
+                : 'bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>0:{questionTimeLeft.toString().padStart(2, '0')}</span>
+          </div>
+          <div className="flex-1 h-2 md:h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-1000 ease-linear ${
+                isTimeWarning ? 'bg-red-500' : 'bg-accent-500'
+              }`}
+              style={{ width: `${(questionTimeLeft / QUESTION_TIME_LIMIT) * 100}%` }}
+            />
           </div>
         </div>
 
@@ -364,7 +429,7 @@ export function QuizPage() {
 
         {currentIndex === questions.length - 1 ? (
           <button
-            onClick={handleSubmit}
+            onClick={() => handleSubmit()}
             disabled={submitting}
             className="flex items-center gap-1 md:gap-2 px-6 md:px-8 py-2.5 md:py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 text-white font-medium rounded-xl transition-colors shadow-lg shadow-primary-500/25 text-sm md:text-base"
           >
@@ -418,45 +483,4 @@ export function QuizPage() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowQuestionNav(false)}
           />
-          <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-3xl shadow-xl max-h-[70vh] overflow-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 dark:text-white">
-                Навігація по питаннях
-              </h3>
-              <button
-                onClick={() => setShowQuestionNav(false)}
-                className="p-2 rounded-lg text-gray-500 dark:text-gray-400"
-              >
-                <ChevronRight className="w-5 h-5 rotate-45" />
-              </button>
-            </div>
-            <div className="p-4 grid grid-cols-5 sm:grid-cols-7 gap-3">
-              {questions.map((q, index) => {
-                const isAnswered = answers[q.id]?.length > 0;
-                const isCurrent = index === currentIndex;
-                return (
-                  <button
-                    key={q.id}
-                    onClick={() => {
-                      setCurrentIndex(index);
-                      setShowQuestionNav(false);
-                    }}
-                    className={`aspect-square rounded-xl font-medium text-base transition-all ${
-                      isCurrent
-                        ? 'bg-primary-600 text-white ring-2 ring-primary-300 ring-offset-2'
-                        : isAnswered
-                        ? 'bg-accent-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                    }`}
-                  >
-                    {index + 1}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+          <div className="absolute bottom-0 left-0 righ
