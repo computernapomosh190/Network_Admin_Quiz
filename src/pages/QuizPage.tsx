@@ -483,4 +483,45 @@ export function QuizPage() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowQuestionNav(false)}
           />
-          <div className="absolute bottom-0 left-0 righ
+                    <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-3xl shadow-xl max-h-[70vh] overflow-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900 dark:text-white">
+                Навігація по питаннях
+              </h3>
+              <button
+                onClick={() => setShowQuestionNav(false)}
+                className="p-2 rounded-lg text-gray-500 dark:text-gray-400"
+              >
+                <ChevronRight className="w-5 h-5 rotate-45" />
+              </button>
+            </div>
+            <div className="p-4 grid grid-cols-5 sm:grid-cols-7 gap-3">
+              {questions.map((q, index) => {
+                const isAnswered = answers[q.id]?.length > 0;
+                const isCurrent = index === currentIndex;
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => {
+                      setCurrentIndex(index);
+                      setShowQuestionNav(false);
+                    }}
+                    className={`aspect-square rounded-xl font-medium text-base transition-all ${
+                      isCurrent
+                        ? 'bg-primary-600 text-white ring-2 ring-primary-300 ring-offset-2'
+                        : isAnswered
+                        ? 'bg-accent-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                    }`}
+                  >
+                    {index + 1}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
