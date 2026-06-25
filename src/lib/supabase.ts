@@ -17,6 +17,12 @@ export type User = {
   email: string;
   role: 'user' | 'admin';
   created_at: string;
+  attempts_remaining?: number;
+};
+
+export type MatchingPair = {
+  left: string;
+  right: string;
 };
 
 export type Question = {
@@ -25,7 +31,7 @@ export type Question = {
   difficulty: 'easy' | 'medium' | 'hard';
   question: string;
   question_type: 'single' | 'multiple' | 'matching' | 'true_false' | 'practical';
-  options: string[];
+  options: string[] | MatchingPair[];
   correct_answers: number[];
   points: number;
   created_at: string;
