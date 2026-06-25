@@ -17,6 +17,7 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -329,7 +330,6 @@ export function AdminDashboard() {
   });
 
   const handleDeleteUser = async (userId: string) => {
-    // Delete result, then user
     await supabase.from('quiz_results').delete().eq('user_id', userId);
     const { error } = await supabase.from('users').delete().eq('id', userId);
     if (!error) {
@@ -337,6 +337,19 @@ export function AdminDashboard() {
       loadData();
     } else {
       alert('Помилка при видаленні учасника');
+    }
+  };
+
+  const handleResetAttempt = async (userId: string, userName: string) => {
+    if (!window.confirm(`Скинути спробу для ${userName}? Учасник зможе пройти вікторину знову.`)) return;
+    const { error } = await supabase
+      .from('users')
+      .update({ attempts_remaining: 1 })
+      .eq('id', userId);
+    if (!error) {
+      loadData();
+    } else {
+      alert('Помилка при скиданні спроби');
     }
   };
 
@@ -556,7 +569,7 @@ export function AdminDashboard() {
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700 border-y border-gray-100 dark:border-gray-600">
                   <tr>
-                    {['ID', 'Прізвище', "Ім'я", 'Email', 'Бали', 'Час', 'Місце', 'Дата', 'Дії'].map((h) => (
+                    {['ID', 'Прізвище', "Ім'я", 'Email', 'Бали', 'Час', 'Місце', 'Спроби', 'Дата', 'Дії'].map((h) => (
                       <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{h}</th>
                     ))}
                   </tr>
@@ -586,6 +599,15 @@ export function AdminDashboard() {
                       <td className="px-3 py-3 text-center text-xs text-gray-500 dark:text-gray-400">
                         {u.result ? new Date(u.result.finished_at).toLocaleDateString('uk-UA') : new Date(u.created_at).toLocaleDateString('uk-UA')}
                       </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
+                          (u.attempts_remaining ?? 1) > 0
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                        }`}>
+                          {u.attempts_remaining ?? 1}
+                        </span>
+                      </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-1">
                           <button
@@ -605,6 +627,15 @@ export function AdminDashboard() {
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
+                          {(u.attempts_remaining ?? 1) === 0 && (
+                            <button
+                              onClick={() => handleResetAttempt(u.id, `${u.surname} ${u.name}`)}
+                              className="p-1.5 text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+                              title="Скинути спробу"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => setConfirmDeleteUser(u)}
                             className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
